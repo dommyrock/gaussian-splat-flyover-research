@@ -7,7 +7,7 @@
 <style>
   :root { --bg: #000; --panel: rgba(12, 14, 20, 0.72); --text: #e8ebf2; --muted: #9aa3b5; --accent: #e3168c; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
-  #stage { position: absolute; inset: 0; touch-action: none; cursor: grab; }
+  #stage { position: absolute; inset: 0; touch-action: pan-y; cursor: grab; }  /* vertical swipes still scroll the host page */
   #stage:active { cursor: grabbing; }
   #stage canvas { display: block; width: 100%; height: 100%; }
   #poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity .6s; pointer-events: none; }
@@ -27,7 +27,7 @@
 <div id="ui">
   <button id="play" aria-label="Pause">❚❚</button>
   <input id="scrub" type="range" min="0" max="1" value="0" step="0.001" aria-label="Position along the flight path" />
-  <span id="hint">drag to look · scroll to fly · right-drag to drift</span>
+  <span id="hint">drag to look · click, then scroll to fly · right-drag to drift</span>
 </div>
 <script type="importmap">
 { "imports": {
@@ -48,6 +48,7 @@ const SPEED = 0.12;                      // auto-fly speed in path-fractions per
 const qp = new URLSearchParams(location.search);
 const base = qp.get('base') || '.';
 const cfg = await (await fetch(`${base}/poses.json`)).json();
+if (/^[0-9a-f]{6}$/i.test(qp.get('accent') || '')) document.documentElement.style.setProperty('--accent', '#' + qp.get('accent'));
 const stage = document.getElementById('stage'), status = document.getElementById('status'), poster = document.getElementById('poster');
 
 const renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -100,11 +101,11 @@ function place() {
 
 // input
 const clamp = (v, a) => Math.max(-a, Math.min(a, v));
-let drag = null;
+let drag = null, engaged = false;   // wheel only flies after a click inside, so page scrolling passes through
 stage.addEventListener('contextmenu', e => e.preventDefault());
 stage.addEventListener('pointerdown', e => {
   stage.setPointerCapture(e.pointerId);
-  drag = { x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey, n: (drag?.n || 0) + 1 };
+  drag = { x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey }; engaged = true;
   setPlaying(false);
 });
 stage.addEventListener('pointermove', e => {
@@ -122,7 +123,9 @@ stage.addEventListener('pointermove', e => {
 const endDrag = () => { drag = null; };
 stage.addEventListener('pointerup', endDrag);
 stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('pointerleave', () => { if (!drag) engaged = false; });
 stage.addEventListener('wheel', e => {
+  if (!engaged) return;
   e.preventDefault(); setPlaying(false);
   s = Math.min(1, Math.max(0, s + e.deltaY * 0.0008));
 }, { passive: false });

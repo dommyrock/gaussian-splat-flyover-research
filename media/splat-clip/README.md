@@ -14,9 +14,9 @@ A small, web-ready Gaussian splat of one stretch of the flight: from the freeway
 
 **Try it locally:** `python3 -m http.server 8765` in this folder, then open http://localhost:8765/.
 
-**Controls:** it flies back and forth on its own. Drag to look around (±20° left/right, ±10° up/down), scroll or use the slider to move along the path, right-drag (or shift-drag) to drift sideways, space to pause, `r` to reset the view. Rendering stops while it's off screen.
+**Controls:** it flies back and forth on its own. Drag to look around (±20° left/right, ±10° up/down), click inside and scroll, or use the slider, to move along the path (until you click, the wheel scrolls the host page), right-drag (or shift-drag) to drift sideways, space to pause, `r` to reset the view. Rendering stops while it's off screen.
 
-**URL options:** `?base=/path/to/files` (where `clip.spz` and `poses.json` live), `?spz=other.spz`, `?bg=000000`, `?shot=0.5` (screenshot mode, used by `script_examples/render_clip.mjs`).
+**URL options:** `?base=/path/to/files` (where `clip.spz` and `poses.json` live), `?spz=other.spz`, `?bg=000000`, `?accent=4ade80` (slider colour), `?shot=0.5` (screenshot mode, used by `script_examples/render_clip.mjs`).
 
 ## How it was made (2026-11-22, about 35 minutes end to end)
 
