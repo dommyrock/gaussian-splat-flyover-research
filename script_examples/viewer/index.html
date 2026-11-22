@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Downtown Splat Spike</title>
+<style>
+  :root { --bg: #0b0d12; --panel: rgba(16, 19, 26, 0.82); --text: #e8ebf2; --muted: #9aa3b5; --accent: #e3168c; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  #ui { position: fixed; left: 16px; right: 16px; bottom: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+        background: var(--panel); padding: 10px 12px; border-radius: 10px; backdrop-filter: blur(6px); max-width: 760px; }
+  button { background: #222837; color: var(--text); border: 1px solid #343c50; border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit; }
+  button.on { background: var(--accent); border-color: var(--accent); }
+  input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+  #status { position: fixed; top: 12px; left: 16px; color: var(--muted); font-size: 13px; }
+  .muted { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="status">Loading splat…</div>
+<div id="ui">
+  <button id="play">▶ Fly path</button>
+  <input id="scrub" type="range" min="0" max="199" value="0" step="0.01" aria-label="Position along flight path" />
+  <span id="idx" class="muted">0</span>
+  <button id="free">Free orbit</button>
+  <span class="muted">Drag to rotate · right-drag to pan · scroll to zoom</span>
+</div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/",
+  "@sparkjsdev/spark": "https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.3.1/dist/spark.module.js"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { SplatMesh, SparkRenderer } from '@sparkjsdev/spark';
+
+const file = new URLSearchParams(location.search).get('ply') || 'downtown.ply';
+const cfg = await (await fetch('poses.json')).json();
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(new URLSearchParams(location.search).get('bg') ? '#' + new URLSearchParams(location.search).get('bg') : 0x8fb3d9);
+// ?spark={"maxPixelRadius":4096,...} overrides SparkRenderer options (tuning / eval)
+const sparkOpts = JSON.parse(new URLSearchParams(location.search).get('spark') || '{}');
+// maxPixelRadius default (512) clips the huge sky/background splats: measured 18.5 → 23.7 dB PSNR with 4096
+scene.add(new SparkRenderer({ renderer, maxPixelRadius: 4096, clipXY: 3, ...sparkOpts }));
+const camera = new THREE.PerspectiveCamera(cfg.vfov, innerWidth / innerHeight, 0.01, 1000);
+camera.up.fromArray(cfg.up);
+
+const splat = new SplatMesh({ url: file });
+scene.add(splat);
+splat.initialized.then(() => { status.textContent = `${file} · ${splat.numSplats?.toLocaleString?.() ?? ''} splats`; });
+const status = document.getElementById('status');
+
+const poses = cfg.poses.map(p => {
+  const m = p.matrix;
+  const basis = new THREE.Matrix4().makeBasis(
+    new THREE.Vector3(m[0], m[1], m[2]), new THREE.Vector3(m[3], m[4], m[5]), new THREE.Vector3(m[6], m[7], m[8]));
+  return { pos: new THREE.Vector3().fromArray(p.position), quat: new THREE.Quaternion().setFromRotationMatrix(basis) };
+});
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enabled = false;
+
+const scrub = document.getElementById('scrub'), idx = document.getElementById('idx');
+const playBtn = document.getElementById('play'), freeBtn = document.getElementById('free');
+scrub.max = poses.length - 1;
+let playing = false, t = 0;
+
+function setPose(x) {
+  const i = Math.min(Math.floor(x), poses.length - 2), f = x - i;
+  camera.position.lerpVectors(poses[i].pos, poses[i + 1].pos, f);
+  camera.quaternion.slerpQuaternions(poses[i].quat, poses[i + 1].quat, f);
+  idx.textContent = `${Math.round(x)} / ${poses.length - 1}`;
+}
+function enterFree() {
+  playing = false; playBtn.classList.remove('on'); playBtn.textContent = '▶ Fly path';
+  controls.enabled = true; freeBtn.classList.add('on');
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  controls.target.copy(camera.position).addScaledVector(fwd, 1.0);
+  controls.update();
+}
+function leaveFree() { controls.enabled = false; freeBtn.classList.remove('on'); }
+
+playBtn.onclick = () => {
+  playing = !playing; leaveFree();
+  playBtn.classList.toggle('on', playing); playBtn.textContent = playing ? '❚❚ Pause' : '▶ Fly path';
+};
+freeBtn.onclick = () => controls.enabled ? (leaveFree(), setPose(t)) : enterFree();
+scrub.oninput = () => { t = +scrub.value; playing = false; playBtn.classList.remove('on'); playBtn.textContent = '▶ Fly path'; leaveFree(); setPose(t); };
+
+setPose(0);
+
+// Screenshot mode for tools/render_eval.mjs: ?pose=N[&off=right,up,fwd][&yaw=deg] → camera at training pose N,
+// optionally offset (scene units, camera axes) / yawed around world up; sets window.__ready once the splat has settled.
+const qp = new URLSearchParams(location.search);
+const frames = n => new Promise(res => { const tick = () => (--n <= 0 ? res() : requestAnimationFrame(tick)); tick(); });
+window.__shot = async (pose, off = [0, 0, 0], yaw = 0) => {
+  setPose(pose);
+  const ax = v => new THREE.Vector3(...v).applyQuaternion(camera.quaternion);
+  camera.position.addScaledVector(ax([1, 0, 0]), off[0]).addScaledVector(ax([0, 1, 0]), off[1]).addScaledVector(ax([0, 0, -1]), off[2]);
+  if (yaw) camera.rotateOnWorldAxis(new THREE.Vector3().fromArray(cfg.up), THREE.MathUtils.degToRad(yaw));
+  await frames(45);  // let Spark re-sort splats for the new viewpoint
+};
+if (qp.has('pose')) {
+  document.getElementById('ui').style.display = 'none'; status.style.display = 'none';
+  splat.initialized.then(async () => { await window.__shot(+qp.get('pose')); window.__ready = true; });
+}
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
+});
+let last = performance.now();
+renderer.setAnimationLoop(now => {
+  const dt = (now - last) / 1000; last = now;
+  if (playing) { t += dt * 3; if (t >= poses.length - 1) t = 0; scrub.value = t; setPose(t); }
+  if (controls.enabled) controls.update();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

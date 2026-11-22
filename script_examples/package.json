@@ -1,0 +1,11 @@
+{
+  "name": "splat-flyover-script-examples",
+  "version": "1.0.0",
+  "description": "Headless splat renders for evaluation (render_eval.mjs)",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "puppeteer-core": "^24.43.1"
+  },
+  "private": true
+}
