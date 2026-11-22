@@ -35,6 +35,8 @@ flowchart LR
 | --- | --- |
 | ![](media/hero/skyline-freeways_render.jpg) | ![](media/hero/clarissa-bay_render.jpg) |
 
+**Explorable clip:** [`media/splat-clip/`](media/splat-clip/) has a 3 MB splat of 5 seconds of downtown, trained on that section alone, with an embeddable viewer: it flies the real camera path back and forth and lets you look around.
+
 **Two fixes that mattered most:**
 1. **SAM 2 helicopter masks** instead of a fixed circle removed the rotor-blade shards and the centre smear: **+2.7 dB**.
    ![Before/after SAM 2 masks](media/masks/before-after_sam2_p063.jpg)
@@ -62,15 +64,16 @@ media/
   offpath/         renders 20–50 m off the flight path, v1 vs v2 sheets
   viewer/          viewer before/after (masks + Spark settings)
   pipeline/        source frame and early preview frames
+  splat-clip/      3 MB web splat of 5 s of downtown + embeddable viewer, poster, fallback MP4
 script_examples/   working scripts (frames, poses, SAM 2 masks, viewer, eval) + 2 failed approaches
 data/              held-out metrics, v1-vs-v2 metrics, camera poses, COLMAP camera + stats, shot lists
 ```
 
-**Not included (deleted on purpose):** `.ply` splats (≈1.8 GB), source video, the 200 frames, the COLMAP database, the SAM 2 checkpoint and the Python environments. Sizes are recorded in [results-and-sizes.md](docs/results-and-sizes.md); the [runbook](docs/pipeline-runbook.md) recreates everything.
+**Not included (deleted on purpose):** the full-scene `.ply` splats (≈1.8 GB), source video, the 200 frames, the COLMAP database, the SAM 2 checkpoint and the Python environments. Sizes are recorded in [results-and-sizes.md](docs/results-and-sizes.md); the [runbook](docs/pipeline-runbook.md) recreates everything.
 
 ## Stack
 COLMAP 4.2.1 · Brush 0.3.0 (Burn/wgpu, Metal) · SAM 2.1 base+ (PyTorch 2.15, MPS) · ffmpeg 9 · OpenCV · three.js 0.186 + Spark 2.3 · puppeteer-core · Apple M5 Pro, 64 GB
 
 ## Credits and rights
 - Source footage: "How BIG Is the GTA 6 Map? I Flew Across It in a Helicopter!" by **GameV** on YouTube (2:30–3:44), PS5 Pro gameplay. *Grand Theft Auto VI* is © Rockstar Games.
-- All images in `media/` are frames or renders derived from that footage, used here for non-commercial research and commentary. No splat or model files are distributed.
+- All images in `media/` are frames or renders derived from that footage, used here for non-commercial research and commentary. The only model file is the 3 MB, 5-second clip in `media/splat-clip/`; the full-scene splats are not distributed.

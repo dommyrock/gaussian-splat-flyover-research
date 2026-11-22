@@ -10,3 +10,10 @@
 node_modules/
 .venv*/
 .DS_Store
+
+# local rebuild workspace
+work/
+
+# the small web-ready clip is the one splat we do publish
+!media/splat-clip/clip.spz
+!media/splat-clip/clip.mp4
